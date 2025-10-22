@@ -1,75 +1,146 @@
-# React + TypeScript + Vite
+# Slamet Ticketing
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Aplikasi pemesanan tiket pendakian Gunung Slamet. Pengunjung bisa cek kuota, membuat booking, membayar via Midtrans (Snap), mengunduh tiket PDF, sementara admin mengelola jalur/slot/harga/penutupan, memantau pembayaran, serta melakukan check-in.
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Fitur
 
-## React Compiler
+### Pengunjung
+- Cek kuota per jalur & tanggal (filter rentang hari).
+- Form anggota sesuai jumlah party.
+- Buat booking (**wajib login**).
+- Pembayaran via **Midtrans Snap**.
+- Unduh tiket **PDF** setelah status **PAID**.
+- Kelola **profil** & ganti **password**.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### Admin
+- Dashboard ringkas (Pending, Paid, Today, Revenue).
+- Daftar booking + pencarian & filter status.
+- Ubah status (mark as **PAID/EXPIRED**) & detail booking.
+- Kelola anggota, **check-in per anggota** atau **check-in semua** (hanya setelah **PAID**).
+- CRUD **Trails**, **Slots** (bulk create), **Prices**, **Closures**.
+- Daftar & manajemen **Users** (role).
 
-## Expanding the ESLint configuration
+---
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Teknologi
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+- **Frontend:** React + Vite, React Router, TanStack Query, Zod, Tailwind CSS (utility classes), Sonner (toast), `react-day-picker`
+- **Backend:** Node.js + Express
+- **Database:** MySQL (Prisma)
+- **Auth:** JWT (httpOnly cookie)
+- **Pembayaran:** Midtrans Snap (Client Key/Server Key)
+- **PDF:** pdf-lib
+- **TypeScript:** 5.8
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+---
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## Menjalankan Secara Lokal
+
+### Prasyarat
+- **Node.js 18+**
+- **MySQL** (lokal) atau layanan kompatibel (PlanetScale, dsb.)
+
+### Konfigurasi `.env`
+
+Buat file `.env` di root:
+
+```env
+# Server
+NODE_ENV=development
+PORT=3000
+FRONTEND_ORIGIN=http://localhost:5173
+COOKIE_NAME=sid
+# COOKIE_DOMAIN dikosongkan saat dev (jangan isi 'localhost')
+# COOKIE_DOMAIN=example.com
+
+# Database (sesuaikan user/pass/host/db)
+DATABASE_URL=mysql://root:password@localhost:3306/slamet_ticketing
+
+# Base URL publik untuk callback Snap
+PUBLIC_BASE_URL=http://localhost:5173
+
+# Midtrans (Sandbox)
+MIDTRANS_SERVER_KEY=SB-Mid-server-xxxxxxxxxxxxxxxx
+MIDTRANS_CLIENT_KEY=SB-Mid-client-xxxxxxxxxxxxxxxx
+
+# Optional: aktifkan mock pembayaran saat dev
+# PAYMENTS_MOCK=1
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+---
+## install deps
+npm install
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## generate prisma client
+npx prisma generate
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## migrasi database
+npx prisma migrate dev
+
+## jalankan client + server secara bersamaan
+npm run dev
+
+## atau terpisah:
+npm run dev:server    # http://localhost:3000
+npm run dev:client    # http://localhost:5173
+
+---
+
+## Midtrans + ngrok (local webhook)
+
+Saat development, Midtrans perlu mengirim **Payment Notification** (webhook) ke server kamu. Karena server lokal tidak publik, gunakan **ngrok** untuk membuat URL HTTPS sementara.
+
+### 1) Jalankan server lokal
+Pastikan API kamu jalan di port 3000:
+```bash
+npm run dev:server       # http://localhost:3000
 ```
-# slamet-ticketing
-# slamet-ticketing
+
+### 2) Jalankan ngrok
+Unduh ngrok (Windows: ngrok.exe), login, lalu buat tunnel ke port 3000.
+```bash
+ngrok config add-authtoken <TOKEN_KAMU>
+ngrok http 3000
+```
+Catat URL HTTPS yang muncul, misal:
+```bash
+https://ab12-34-56-78-90.ngrok-free.app
+```
+
+### 3) Konfigurasi di Midtrans Dashboard (Sandbox)
+Masuk ke Midtrans Dashboard → Settings → Configuration (Sandbox).
+- Payment Notification URL
+Set ke:
+```bash
+https://<NGROK_HTTPS>/api/payments/midtrans/notifications
+```
+- Finish / Pending / Error Redirect URL (Snap)
+Di app ini sudah di-override per transaksi via parameter callbacks saat create Snap token, yang diarahkan ke:
+```bash
+${PUBLIC_BASE_URL}/me/bookings
+```
+
+### 4) Cek konektivitas cepat
+Coba akses endpoint health melalui ngrok (harus 200 OK):
+```bash
+GET https://<NGROK_HTTPS>/api/health
+```
+
+### 5) Uji alur pembayaran
+- Buat booking → klik Bayar → selesaikan pembayaran sandbox.
+- Midtrans akan memanggil webhook:
+  
+  ```bash
+  POST https://<NGROK_HTTPS>/api/payments/midtrans/notifications
+  ```
+
+  Pastikan server tidak melindungi route ini dengan auth (memang tidak di app ini) dan memverifikasi signature Midtrans.
+---
+
+## Troubleshooting
+- Ngrok URL tidak HTTPS → pastikan pakai URL https://… (Midtrans mensyaratkan HTTPS).
+- Webhook 404 → pastikan route backend benar: /api/payments/midtrans/notifications.
+- 401/403 → jangan pasang middleware auth di endpoint webhook.
+- Status booking tidak update → cek log server; pastikan handler webhook mengubah status dan tidak error validasi.
