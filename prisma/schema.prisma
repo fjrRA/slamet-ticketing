@@ -1,0 +1,160 @@
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+  // Saran: biarkan default (import dari "@prisma/client"),
+  // agar Prisma Client tidak ikut ter-bundle ke frontend Vite.
+  // Hapus "output" custom kalau sebelumnya ada.
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ===== Models =====
+model User {
+  id        String    @id @default(cuid())
+  name      String
+  email     String    @unique
+  phone     String?
+  password  String
+  role      Role      @default(USER)
+  bookings  Booking[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Trail {
+  id           String     @id @default(cuid())
+  name         String     @unique
+  mountainName String     @default("Gunung Slamet")
+  basecamp     String?
+  maxGroupSize Int?
+  basecampCode String?
+  isActive     Boolean    @default(true)
+  slots        TimeSlot[]
+  prices       Price[]
+  bookings     Booking[]
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  closures Closure[]
+}
+
+model TimeSlot {
+  id            String    @id @default(cuid())
+  trail         Trail     @relation(fields: [trailId], references: [id], onDelete: Restrict)
+  trailId       String
+  date          DateTime  @db.Date
+  quotaTotal    Int       @db.UnsignedInt
+  quotaReserved Int       @default(0) @db.UnsignedInt
+  quotaPaid     Int       @default(0) @db.UnsignedInt
+  bookings      Booking[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([trailId, date])
+  @@index([date])
+}
+
+model Price {
+  id                String   @id @default(cuid())
+  trail             Trail    @relation(fields: [trailId], references: [id], onDelete: Cascade)
+  trailId           String
+  startDate         DateTime @db.Date
+  endDate           DateTime @db.Date
+  priceLocal        Int      @db.UnsignedInt
+  priceNonLocal     Int      @db.UnsignedInt
+  weekendMultiplier Float    @default(1)
+  seasonLabel       String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([trailId, startDate, endDate])
+}
+
+model Booking {
+  id        String          @id @default(cuid())
+  orderId   String          @unique
+  user      User            @relation(fields: [userId], references: [id], onDelete: Restrict)
+  userId    String
+  trail     Trail           @relation(fields: [trailId], references: [id], onDelete: Restrict)
+  trailId   String
+  slot      TimeSlot        @relation(fields: [slotId], references: [id], onDelete: Restrict)
+  slotId    String
+  partySize Int             @db.UnsignedInt
+  total     Int             @db.UnsignedInt
+  status    BookingStatus   @default(PENDING)
+  note      String?       // <— NEW
+  members   BookingMember[]
+  payment   Payment?
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  // Check-in
+  checkedInAt  DateTime?
+  checkedInBy  String? 
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt]) // sekarang valid karena enum (scalar)
+  @@index([slotId, createdAt])
+}
+
+model BookingMember {
+  id          String    @id @default(cuid())
+  booking     Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  bookingId   String
+  fullName    String
+  idNumber    String
+  birthdate   DateTime? @db.Date
+  gender      String?
+  city        String?
+  checkedIn   Boolean   @default(false)
+  checkedInAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([bookingId, idNumber]) // cegah duplikasi anggota dalam 1 booking
+  @@index([bookingId])
+}
+
+model Payment {
+  id                String    @id @default(cuid())
+  booking           Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  bookingId         String    @unique
+  transactionId     String?
+  grossAmount       Int       @db.UnsignedInt
+  paymentType       String?
+  transactionStatus String // @default("pending") bisa diganti enum kalau mau
+  fraudStatus       String?
+  signatureKey      String?
+  rawNotif          Json?
+  settledAt         DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
+
+model Closure {
+  id        String   @id @default(cuid())
+  trail     Trail    @relation(fields: [trailId], references: [id], onDelete: Cascade)
+  trailId   String
+  date      DateTime @db.Date
+  reason    String?
+  createdAt DateTime @default(now())
+
+  @@unique([trailId, date])
+}
+
+// ===== Enums =====
+enum Role {
+  USER
+  ADMIN
+}
+
+enum BookingStatus {
+  PENDING
+  PAID
+  EXPIRED
+  CANCELLED
+  REFUNDED
+}
